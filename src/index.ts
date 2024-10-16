@@ -1,4 +1,5 @@
 import express from 'express'
+import cors from 'cors'
 import type { Application } from 'express'
 import { graphqlHTTP } from 'express-graphql'
 import {
@@ -42,8 +43,8 @@ const RootQuery = new GraphQLObjectType({
       resolve: (parent, args) => books.find(book => book.id === args.id)
     },
     // All supported fields at the root level
-    books: {
-      type: new GraphQLList(BookType),
+    getBooks: {
+      type: GetBooksQuery,
       description: 'List of all books',
       args: {
         sort: { type: GraphQLString, defaultValue: 'ASC' }
@@ -92,6 +93,12 @@ const schema = new GraphQLSchema({
   query: RootQuery,
   mutation: RootMutation
 })
+
+app.use(
+  cors({
+    origin: 'http://localhost:5173'
+  })
+)
 
 app.use(
   '/graphql',
