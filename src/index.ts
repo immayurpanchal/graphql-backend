@@ -15,12 +15,53 @@ import { authors, AuthorType, books, BookType } from './data'
 
 const app: Application = express()
 
-const BookArgs = new GraphQLInputObjectType({
-  name: 'BookArgs',
+const SortInputType = new GraphQLInputObjectType({
+  name: 'SortInput',
   fields: {
-    id: { type: GraphQLInt }
+    sortCriteria: {
+      type: new GraphQLList(
+        new GraphQLInputObjectType({
+          name: 'SortCriteriaInput',
+          fields: {
+            field: { type: GraphQLString },
+            order: { type: GraphQLString }
+          }
+        })
+      )
+    }
   }
 })
+
+type SortCriteria = {
+  field: string
+  order: 'ASC' | 'DESC'
+}
+
+type Sort = {
+  sortCriteria: SortCriteria[]
+}
+
+const sortResolver = <T extends Record<PropertyKey, string | number>>(
+  oldData: T[],
+  sort: Sort
+) => {
+  const data = [...oldData]
+  if (sort && sort.sortCriteria) {
+    return data.sort((a, b) => {
+      for (const criteria of sort.sortCriteria) {
+        const field = criteria.field
+        const order = criteria.order
+        if (a[field] < b[field]) {
+          return order === 'ASC' ? -1 : 1
+        } else if (a[field] > b[field]) {
+          return order === 'ASC' ? 1 : -1
+        }
+      }
+      return 0
+    })
+  }
+  return data
+}
 
 const RootQuery = new GraphQLObjectType({
   name: 'Query',
@@ -44,16 +85,13 @@ const RootQuery = new GraphQLObjectType({
     },
     // All supported fields at the root level
     getBooks: {
-      type: GetBooksQuery,
+      type: new GraphQLList(BookType),
       description: 'List of all books',
       args: {
-        sort: { type: GraphQLString, defaultValue: 'ASC' }
+        sort: { type: SortInputType }
       },
       resolve: (parent, args) => {
-        const sortedBooks = [...books]
-        if (args.sort === 'DESC') {
-          sortedBooks.sort((a, b) => b.id - a.id)
-        }
+        const sortedBooks = sortResolver(books, args.sort)
         return sortedBooks
       }
     },
